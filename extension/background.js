@@ -1,106 +1,199 @@
 // ============================================
 // BACKGROUND SERVICE WORKER
 // ============================================
-// Relays gesture messages from the detector
-// window to the Instagram content script.
-// Also manages the detector window lifecycle.
+// Relays gesture messages from detector window
+// to Instagram content script. Keeps alive while
+// detector is open.
 // ============================================
 
 let detectorWindowId = null;
 let activeInstagramTabId = null;
 
-// Listen for messages from popup or detector window
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "OPEN_DETECTOR") {
-        openDetectorWindow(message.tabId);
-        sendResponse({ success: true });
-        return true;
-    }
+// ============================================
+// KEEPALIVE — Prevent service worker termination
+// ============================================
+// MV3 service workers die after ~5 min of inactivity.
+// We use chrome.alarms to stay alive while detector is open.
 
-    if (message.type === "CLOSE_DETECTOR") {
-        closeDetectorWindow();
-        sendResponse({ success: true });
-        return true;
-    }
+async function startKeepalive() {
+    await chrome.alarms.create("keepalive", { periodInMinutes: 0.4 }); // Every 24s
+    console.log("⏰ Keepalive alarm started");
+}
 
-    if (message.type === "DETECTOR_STATUS") {
-        sendResponse({
-            isOpen: detectorWindowId !== null,
-            instagramTabId: activeInstagramTabId
-        });
-        return true;
-    }
+async function stopKeepalive() {
+    await chrome.alarms.clear("keepalive");
+    console.log("⏰ Keepalive alarm stopped");
+}
 
-    if (message.type === "SCROLL_NEXT_REEL") {
-        // Forward to Instagram content script
-        if (activeInstagramTabId) {
-            chrome.tabs.sendMessage(activeInstagramTabId, {
-                type: "SCROLL_NEXT_REEL"
-            }).catch(err => {
-                console.warn("Could not send to Instagram tab:", err);
-            });
-        }
-        sendResponse({ success: true });
-        return true;
-    }
-
-    if (message.type === "SCROLL_PREV_REEL") {
-        if (activeInstagramTabId) {
-            chrome.tabs.sendMessage(activeInstagramTabId, {
-                type: "SCROLL_PREV_REEL"
-            }).catch(err => {
-                console.warn("Could not send to Instagram tab:", err);
-            });
-        }
-        sendResponse({ success: true });
-        return true;
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "keepalive") {
+        // Just receiving this alarm keeps the worker alive
+        console.log("💓 Keepalive pulse");
     }
 });
 
+// ============================================
+// PERSIST STATE — Survive service worker restarts
+// ============================================
+async function saveState() {
+    await chrome.storage.session.set({
+        detectorWindowId,
+        activeInstagramTabId
+    });
+}
+
+async function loadState() {
+    const data = await chrome.storage.session.get(["detectorWindowId", "activeInstagramTabId"]);
+    if (data.detectorWindowId) {
+        // Verify the window still exists
+        try {
+            await chrome.windows.get(data.detectorWindowId);
+            detectorWindowId = data.detectorWindowId;
+            activeInstagramTabId = data.activeInstagramTabId;
+            console.log("📦 Restored state — detector:", detectorWindowId, "tab:", activeInstagramTabId);
+            startKeepalive();
+        } catch {
+            // Window no longer exists
+            detectorWindowId = null;
+            activeInstagramTabId = null;
+            await saveState();
+        }
+    }
+}
+
+// Restore state on worker startup
+loadState();
+
+// ============================================
+// MESSAGE HANDLER
+// ============================================
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    handleMessage(message, sender).then(sendResponse).catch(err => {
+        console.error("Message handler error:", err);
+        sendResponse({ success: false, error: err.message });
+    });
+    return true; // Will respond asynchronously
+});
+
+async function handleMessage(message, sender) {
+    switch (message.type) {
+        case "OPEN_DETECTOR":
+            await openDetectorWindow(message.tabId);
+            return { success: true };
+
+        case "CLOSE_DETECTOR":
+            await closeDetectorWindow();
+            return { success: true };
+
+        case "DETECTOR_STATUS":
+            return {
+                isOpen: detectorWindowId !== null,
+                instagramTabId: activeInstagramTabId
+            };
+
+        case "KEEPALIVE":
+            // Just receiving this keeps the worker alive
+            return { success: true };
+
+        case "SCROLL_NEXT_REEL":
+        case "SCROLL_PREV_REEL":
+        case "LIKE_REEL":
+        case "SAVE_REEL":
+            await forwardToInstagram(message.type);
+            return { success: true };
+
+        default:
+            return { success: false, error: "Unknown message type" };
+    }
+}
+
+// ============================================
+// FORWARD TO INSTAGRAM
+// ============================================
+async function forwardToInstagram(type) {
+    if (!activeInstagramTabId) {
+        console.warn("No active Instagram tab");
+        return;
+    }
+
+    try {
+        // Verify tab still exists
+        const tab = await chrome.tabs.get(activeInstagramTabId);
+        if (!tab || !tab.url || !tab.url.includes("instagram.com")) {
+            console.warn("Instagram tab no longer valid");
+            return;
+        }
+
+        await chrome.tabs.sendMessage(activeInstagramTabId, { type });
+        console.log(`📨 Forwarded ${type} to tab ${activeInstagramTabId}`);
+    } catch (err) {
+        console.warn(`Could not forward ${type}:`, err.message);
+
+        // Try to find another Instagram tab
+        const tabs = await chrome.tabs.query({ url: "https://www.instagram.com/*" });
+        if (tabs.length > 0) {
+            activeInstagramTabId = tabs[0].id;
+            await saveState();
+            try {
+                await chrome.tabs.sendMessage(activeInstagramTabId, { type });
+                console.log(`📨 Forwarded ${type} to fallback tab ${activeInstagramTabId}`);
+            } catch (err2) {
+                console.warn("Fallback forward also failed:", err2.message);
+            }
+        }
+    }
+}
+
+// ============================================
+// DETECTOR WINDOW MANAGEMENT
+// ============================================
 async function openDetectorWindow(tabId) {
     activeInstagramTabId = tabId;
 
-    // Close existing detector window if any
     if (detectorWindowId) {
         try {
             await chrome.windows.remove(detectorWindowId);
-        } catch (e) {
-            // Window might already be closed
-        }
+        } catch (e) { /* already closed */ }
     }
 
-    // Get the current window to position the detector
     const currentWindow = await chrome.windows.getCurrent();
 
-    // Open detector as a small popup window positioned to the right
     const win = await chrome.windows.create({
         url: chrome.runtime.getURL("detector.html"),
         type: "popup",
         width: 380,
-        height: 520,
+        height: 560,
         left: currentWindow.left + currentWindow.width - 400,
         top: currentWindow.top + 50
     });
 
     detectorWindowId = win.id;
+    await saveState();
+    await startKeepalive();
 
     console.log("🔍 Detector window opened:", detectorWindowId);
 }
 
-function closeDetectorWindow() {
+async function closeDetectorWindow() {
     if (detectorWindowId) {
-        chrome.windows.remove(detectorWindowId).catch(() => {});
-        detectorWindowId = null;
+        try {
+            await chrome.windows.remove(detectorWindowId);
+        } catch { /* already closed */ }
     }
+    detectorWindowId = null;
     activeInstagramTabId = null;
+    await saveState();
+    await stopKeepalive();
     console.log("🔍 Detector window closed");
 }
 
 // Clean up when detector window is closed manually
-chrome.windows.onRemoved.addListener((windowId) => {
+chrome.windows.onRemoved.addListener(async (windowId) => {
     if (windowId === detectorWindowId) {
         detectorWindowId = null;
         activeInstagramTabId = null;
-        console.log("🔍 Detector window was closed by user");
+        await saveState();
+        await stopKeepalive();
+        console.log("🔍 Detector window closed by user");
     }
 });

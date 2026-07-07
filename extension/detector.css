@@ -296,3 +296,28 @@ body {
     50% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
+
+/* Legend */
+.det-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.6rem;
+    color: #5a5a72;
+    font-weight: 500;
+    padding: 3px 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}
+
+.legend-item span {
+    font-size: 0.7rem;
+    min-width: 22px;
+}
+

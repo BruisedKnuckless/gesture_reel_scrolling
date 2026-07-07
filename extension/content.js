@@ -1,159 +1,287 @@
 // ============================================
-// CONTENT SCRIPT — Instagram Reel Scroller
+// CONTENT SCRIPT — Instagram Reel Controller
 // ============================================
-// Injected into instagram.com pages.
-// Listens for SCROLL messages and clicks the
-// actual up/down navigation buttons on Reels.
+// Handles: scroll next/prev, like, save.
+// Uses multiple strategies for finding buttons.
 // ============================================
 
 (function () {
-    // Prevent double injection
     if (window.__gestureScrollInjected) return;
     window.__gestureScrollInjected = true;
 
-    console.log("🎬 Gesture Reel Scroll — Content script loaded on Instagram");
+    console.log("🎬 Gesture Reel Scroll — Content script loaded");
 
     // ============================================
-    // FIND NAVIGATION BUTTONS
+    // SCROLL: NEXT REEL
     // ============================================
-
-    /**
-     * Find the "next reel" (down chevron ˅) button.
-     * Tries multiple strategies since Instagram changes DOM often.
-     */
-    function findNextButton() {
-        // Strategy 1: Look for SVG-based down chevron buttons
-        // The down chevron button is typically the second navigation button
-        const allSvgs = document.querySelectorAll('svg[aria-label]');
-        for (const svg of allSvgs) {
-            const label = svg.getAttribute('aria-label')?.toLowerCase() || '';
-            if (label.includes('down') || label.includes('next')) {
-                const btn = svg.closest('button') || svg.closest('[role="button"]') || svg.parentElement;
-                if (btn) {
-                    console.log("🔽 Found next button via aria-label:", label);
-                    return btn;
-                }
-            }
-        }
-
-        // Strategy 2: Look for chevron buttons by their visual position
-        // The down arrow is typically a button with a downward-pointing chevron SVG
-        const buttons = document.querySelectorAll('button, [role="button"]');
-        const candidates = [];
-
-        for (const btn of buttons) {
-            const svg = btn.querySelector('svg');
-            if (!svg) continue;
-
-            const rect = btn.getBoundingClientRect();
-            // The nav buttons are on the right side of the viewport, mid-height area
-            if (rect.right > window.innerWidth * 0.7 &&
-                rect.top > window.innerHeight * 0.3 &&
-                rect.bottom < window.innerHeight * 0.85 &&
-                rect.width < 80 && rect.height < 80 &&
-                rect.width > 20 && rect.height > 20) {
-
-                candidates.push({ btn, rect });
-            }
-        }
-
-        // Sort by vertical position — the lower one is "next" (down)
-        candidates.sort((a, b) => a.rect.top - b.rect.top);
-
-        if (candidates.length >= 2) {
-            console.log("🔽 Found next button via position (lower of two nav buttons)");
-            return candidates[1].btn; // Second one = down/next
-        }
-
-        if (candidates.length === 1) {
-            console.log("🔽 Found single nav button, using it as next");
-            return candidates[0].btn;
-        }
-
-        // Strategy 3: Fallback — try scrolling the page
-        console.log("🔽 No nav button found, using scroll fallback");
-        return null;
-    }
-
-    /**
-     * Find the "previous reel" (up chevron ˄) button.
-     */
-    function findPrevButton() {
-        // Strategy 1: aria-label
-        const allSvgs = document.querySelectorAll('svg[aria-label]');
-        for (const svg of allSvgs) {
-            const label = svg.getAttribute('aria-label')?.toLowerCase() || '';
-            if (label.includes('up') || label.includes('prev') || label.includes('back')) {
-                const btn = svg.closest('button') || svg.closest('[role="button"]') || svg.parentElement;
-                if (btn) {
-                    console.log("🔼 Found prev button via aria-label:", label);
-                    return btn;
-                }
-            }
-        }
-
-        // Strategy 2: Position-based — upper nav button
-        const buttons = document.querySelectorAll('button, [role="button"]');
-        const candidates = [];
-
-        for (const btn of buttons) {
-            const svg = btn.querySelector('svg');
-            if (!svg) continue;
-
-            const rect = btn.getBoundingClientRect();
-            if (rect.right > window.innerWidth * 0.7 &&
-                rect.top > window.innerHeight * 0.3 &&
-                rect.bottom < window.innerHeight * 0.85 &&
-                rect.width < 80 && rect.height < 80 &&
-                rect.width > 20 && rect.height > 20) {
-
-                candidates.push({ btn, rect });
-            }
-        }
-
-        candidates.sort((a, b) => a.rect.top - b.rect.top);
-
-        if (candidates.length >= 2) {
-            console.log("🔼 Found prev button via position (upper of two nav buttons)");
-            return candidates[0].btn; // First one = up/prev
-        }
-
-        console.log("🔼 No prev button found");
-        return null;
-    }
-
-    // ============================================
-    // SCROLL ACTIONS
-    // ============================================
-
     function scrollToNextReel() {
-        const btn = findNextButton();
-
-        if (btn) {
-            btn.click();
-            console.log("🔽 Clicked next reel button");
-            showScrollFeedback("⬇️ Next Reel");
-        } else {
-            // Fallback: scroll the page down by viewport height
-            window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-            console.log("🔽 Fallback: scrolled page down");
-            showScrollFeedback("⬇️ Next Reel (scroll)");
+        // Strategy 1: Click the down chevron button (aria-label based)
+        if (clickButtonByAriaLabel(["Down", "Next"])) {
+            console.log("⬇️ Clicked next via aria-label");
+            showFeedback("⬇️ Next Reel", "#6366f1");
+            return;
         }
+
+        // Strategy 2: Find chevron buttons by position (rightmost, lower)
+        const navBtns = findChevronButtons();
+        if (navBtns.next) {
+            navBtns.next.click();
+            console.log("⬇️ Clicked next via position");
+            showFeedback("⬇️ Next Reel", "#6366f1");
+            return;
+        }
+
+        // Strategy 3: Find the current video and scroll its container
+        if (scrollReelContainer(1)) {
+            console.log("⬇️ Scrolled container to next");
+            showFeedback("⬇️ Next Reel", "#6366f1");
+            return;
+        }
+
+        // Strategy 4: Raw scroll
+        window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+        console.log("⬇️ Fallback window scroll");
+        showFeedback("⬇️ Next Reel", "#6366f1");
     }
 
+    // ============================================
+    // SCROLL: PREVIOUS REEL
+    // ============================================
     function scrollToPrevReel() {
-        const btn = findPrevButton();
-
-        if (btn) {
-            btn.click();
-            console.log("🔼 Clicked prev reel button");
-            showScrollFeedback("⬆️ Previous Reel");
-        } else {
-            // Fallback: scroll up
-            window.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
-            console.log("🔼 Fallback: scrolled page up");
-            showScrollFeedback("⬆️ Previous Reel (scroll)");
+        if (clickButtonByAriaLabel(["Up", "Previous", "Back"])) {
+            console.log("⬆️ Clicked prev via aria-label");
+            showFeedback("⬆️ Previous Reel", "#8b5cf6");
+            return;
         }
+
+        const navBtns = findChevronButtons();
+        if (navBtns.prev) {
+            navBtns.prev.click();
+            console.log("⬆️ Clicked prev via position");
+            showFeedback("⬆️ Previous Reel", "#8b5cf6");
+            return;
+        }
+
+        if (scrollReelContainer(-1)) {
+            console.log("⬆️ Scrolled container to prev");
+            showFeedback("⬆️ Previous Reel", "#8b5cf6");
+            return;
+        }
+
+        window.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+        console.log("⬆️ Fallback window scroll");
+        showFeedback("⬆️ Previous Reel", "#8b5cf6");
+    }
+
+    // ============================================
+    // BUTTON FINDING HELPERS
+    // ============================================
+
+    /**
+     * Click a button whose SVG has an aria-label matching any of the given keywords.
+     * Returns true if found and clicked.
+     */
+    function clickButtonByAriaLabel(keywords) {
+        const svgs = document.querySelectorAll('svg[aria-label]');
+        for (const svg of svgs) {
+            const label = svg.getAttribute('aria-label') || '';
+            const match = keywords.some(kw =>
+                label.toLowerCase().includes(kw.toLowerCase())
+            );
+            if (match) {
+                const btn = svg.closest('button') ||
+                            svg.closest('[role="button"]') ||
+                            svg.closest('div[tabindex]') ||
+                            svg.parentElement;
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    // Must be visible on screen
+                    if (rect.width > 0 && rect.height > 0 &&
+                        rect.top >= 0 && rect.bottom <= window.innerHeight + 50) {
+                        btn.click();
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Find the up/down chevron navigation buttons by their position.
+     * They're typically on the far right, stacked vertically, small circular buttons.
+     */
+    function findChevronButtons() {
+        const allElements = document.querySelectorAll('button, [role="button"], div[tabindex]');
+        const candidates = [];
+
+        for (const el of allElements) {
+            const svg = el.querySelector('svg');
+            if (!svg) continue;
+
+            const rect = el.getBoundingClientRect();
+
+            // Chevron buttons are: far right, mid-screen, small, contain SVG with polyline/path
+            const polyline = svg.querySelector('polyline, line, path');
+            if (!polyline) continue;
+
+            if (rect.left > window.innerWidth * 0.8 &&
+                rect.top > window.innerHeight * 0.2 &&
+                rect.bottom < window.innerHeight * 0.85 &&
+                rect.width >= 20 && rect.width <= 90 &&
+                rect.height >= 20 && rect.height <= 90) {
+                candidates.push({ el, rect, cy: rect.top + rect.height / 2 });
+            }
+        }
+
+        // Sort by Y position
+        candidates.sort((a, b) => a.cy - b.cy);
+
+        if (candidates.length >= 2) {
+            return { prev: candidates[0].el, next: candidates[1].el };
+        } else if (candidates.length === 1) {
+            // Single button — guess based on position
+            const isUpperHalf = candidates[0].cy < window.innerHeight / 2;
+            return {
+                prev: isUpperHalf ? candidates[0].el : null,
+                next: isUpperHalf ? null : candidates[0].el
+            };
+        }
+
+        return { prev: null, next: null };
+    }
+
+    /**
+     * Find the scrollable container for Reels and scroll by direction.
+     * direction: 1 = next (down), -1 = prev (up)
+     */
+    function scrollReelContainer(direction) {
+        // Strategy A: Find the visible video, then find its scrollable ancestor
+        const videos = document.querySelectorAll('video');
+        for (const video of videos) {
+            const rect = video.getBoundingClientRect();
+            // Find the video that's currently visible
+            if (rect.top > -100 && rect.top < window.innerHeight / 2) {
+                // Walk up to find the scrollable container
+                let container = video.parentElement;
+                for (let i = 0; i < 15; i++) {
+                    if (!container) break;
+                    const style = window.getComputedStyle(container);
+                    const overflow = style.overflow + style.overflowY;
+                    if ((overflow.includes('auto') || overflow.includes('scroll')) &&
+                        container.scrollHeight > container.clientHeight) {
+                        container.scrollBy({
+                            top: direction * container.clientHeight,
+                            behavior: 'smooth'
+                        });
+                        return true;
+                    }
+                    container = container.parentElement;
+                }
+            }
+        }
+
+        // Strategy B: Find any scrollable div that's roughly full-screen
+        const divs = document.querySelectorAll('div');
+        for (const div of divs) {
+            const style = window.getComputedStyle(div);
+            const overflow = style.overflow + style.overflowY;
+            if ((overflow.includes('auto') || overflow.includes('scroll')) &&
+                div.scrollHeight > div.clientHeight + 100 &&
+                div.clientHeight > window.innerHeight * 0.7) {
+                div.scrollBy({
+                    top: direction * div.clientHeight,
+                    behavior: 'smooth'
+                });
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ============================================
+    // LIKE REEL
+    // ============================================
+    function likeReel() {
+        // Find Like or Unlike button — always click it (toggles)
+        const svgs = document.querySelectorAll('svg[aria-label]');
+        for (const svg of svgs) {
+            const label = svg.getAttribute('aria-label') || '';
+
+            if (label === 'Like' || label === 'like' ||
+                label === 'Unlike' || label === 'unlike') {
+                const btn = svg.closest('button') ||
+                            svg.closest('[role="button"]') ||
+                            svg.closest('div[tabindex]') ||
+                            svg.parentElement;
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0 &&
+                        rect.top >= 0 && rect.bottom <= window.innerHeight + 50) {
+                        btn.click();
+                        console.log("❤️ Toggled like via aria-label:", label);
+                        showFeedback("❤️ Like toggled!", "#ef4444");
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Fallback: Double-click the video to like
+        const videos = document.querySelectorAll('video');
+        for (const video of videos) {
+            const rect = video.getBoundingClientRect();
+            if (rect.top > -100 && rect.top < window.innerHeight / 2) {
+                const clickTarget = video.closest('div') || video;
+                const dblClick = new MouseEvent('dblclick', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: rect.left + rect.width / 2,
+                    clientY: rect.top + rect.height / 2
+                });
+                clickTarget.dispatchEvent(dblClick);
+                console.log("❤️ Liked via double-click");
+                showFeedback("❤️ Like toggled!", "#ef4444");
+                return;
+            }
+        }
+
+        console.log("❤️ Could not find like button");
+        showFeedback("❤️ Like not found", "#888");
+    }
+
+    // ============================================
+    // SAVE REEL
+    // ============================================
+    function saveReel() {
+        // Find Save or Remove button — always click it (toggles)
+        const svgs = document.querySelectorAll('svg[aria-label]');
+        for (const svg of svgs) {
+            const label = svg.getAttribute('aria-label') || '';
+            if (label === 'Save' || label === 'save' ||
+                label === 'Remove' || label === 'remove' ||
+                label === 'Unsave' || label === 'unsave') {
+                const btn = svg.closest('button') ||
+                            svg.closest('[role="button"]') ||
+                            svg.closest('div[tabindex]') ||
+                            svg.parentElement;
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0 &&
+                        rect.top >= 0 && rect.bottom <= window.innerHeight + 50) {
+                        btn.click();
+                        console.log("🔖 Toggled save via aria-label:", label);
+                        showFeedback("🔖 Save toggled!", "#22c55e");
+                        return;
+                    }
+                }
+            }
+        }
+
+        console.log("🔖 Could not find save button");
+        showFeedback("🔖 Save not found", "#888");
     }
 
     // ============================================
@@ -162,40 +290,36 @@
     let feedbackEl = null;
     let feedbackTimeout = null;
 
-    function showScrollFeedback(text) {
+    function showFeedback(text, color = "#6366f1") {
         if (!feedbackEl) {
             feedbackEl = document.createElement("div");
             feedbackEl.id = "gesture-scroll-feedback";
-            feedbackEl.style.cssText = `
-                position: fixed;
-                top: 24px;
-                left: 50%;
-                transform: translateX(-50%) translateY(-20px);
-                background: rgba(99, 102, 241, 0.95);
-                color: white;
-                padding: 10px 20px;
-                border-radius: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
-                font-size: 14px;
-                font-weight: 600;
-                z-index: 999999;
-                pointer-events: none;
-                opacity: 0;
-                transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
-                backdrop-filter: blur(10px);
-                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-                letter-spacing: 0.02em;
-            `;
             document.body.appendChild(feedbackEl);
         }
 
-        if (feedbackTimeout) {
-            clearTimeout(feedbackTimeout);
-        }
+        if (feedbackTimeout) clearTimeout(feedbackTimeout);
 
+        feedbackEl.style.cssText = `
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(0);
+            background: ${color};
+            color: white;
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            z-index: 999999;
+            pointer-events: none;
+            opacity: 1;
+            transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px ${color}66;
+            letter-spacing: 0.02em;
+        `;
         feedbackEl.textContent = text;
-        feedbackEl.style.opacity = "1";
-        feedbackEl.style.transform = "translateX(-50%) translateY(0)";
 
         feedbackTimeout = setTimeout(() => {
             feedbackEl.style.opacity = "0";
@@ -207,16 +331,22 @@
     // MESSAGE LISTENER
     // ============================================
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.type === "SCROLL_NEXT_REEL") {
-            scrollToNextReel();
-            sendResponse({ success: true });
+        console.log("📩 Content script received:", message.type);
+        switch (message.type) {
+            case "SCROLL_NEXT_REEL":
+                scrollToNextReel();
+                break;
+            case "SCROLL_PREV_REEL":
+                scrollToPrevReel();
+                break;
+            case "LIKE_REEL":
+                likeReel();
+                break;
+            case "SAVE_REEL":
+                saveReel();
+                break;
         }
-
-        if (message.type === "SCROLL_PREV_REEL") {
-            scrollToPrevReel();
-            sendResponse({ success: true });
-        }
-
+        sendResponse({ success: true });
         return true;
     });
 

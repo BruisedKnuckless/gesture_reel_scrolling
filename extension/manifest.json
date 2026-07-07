@@ -5,7 +5,9 @@
     "description": "Scroll Instagram Reels with hand gestures using your webcam",
     "permissions": [
         "activeTab",
-        "scripting"
+        "scripting",
+        "alarms",
+        "storage"
     ],
     "host_permissions": [
         "https://www.instagram.com/*"
