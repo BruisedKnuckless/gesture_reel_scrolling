@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Scroll — Finger Tracking</title>
+    <meta name="description" content="Track your index finger via webcam and detect scroll gestures using MediaPipe hand tracking.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">👆</span>
+                <h1>Gesture Scroll</h1>
+            </div>
+            <p class="tagline">Control with your finger</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Camera View -->
+            <div class="camera-container" id="cameraContainer">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
+
+                <!-- Camera loading state -->
+                <div class="camera-placeholder" id="cameraPlaceholder">
+                    <div class="placeholder-icon">📷</div>
+                    <p>Click to enable camera</p>
+                </div>
+
+                <!-- Gesture flash overlay -->
+                <div class="gesture-flash" id="gestureFlash"></div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel">
+                <!-- Status Card -->
+                <div class="card status-card" id="statusCard">
+                    <div class="card-header">
+                        <span class="card-icon">🔴</span>
+                        <h2>Status</h2>
+                    </div>
+                    <div class="status-content">
+                        <p class="status-text" id="statusText">Camera inactive</p>
+                        <div class="status-indicator" id="statusIndicator">
+                            <span class="dot"></span>
+                            <span class="label">Offline</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gesture Detection Card -->
+                <div class="card gesture-card" id="gestureCard">
+                    <div class="card-header">
+                        <span class="card-icon">🖐️</span>
+                        <h2>Gesture</h2>
+                    </div>
+                    <div class="gesture-content">
+                        <div class="gesture-display" id="gestureDisplay">
+                            <span class="gesture-label">Waiting...</span>
+                        </div>
+                        <div class="gesture-history" id="gestureHistory">
+                            <!-- Gesture history items will be added here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Finger Position Card -->
+                <div class="card position-card">
+                    <div class="card-header">
+                        <span class="card-icon">📍</span>
+                        <h2>Index Finger</h2>
+                    </div>
+                    <div class="position-content">
+                        <div class="coord-row">
+                            <span class="coord-label">X</span>
+                            <span class="coord-value" id="fingerX">—</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Y</span>
+                            <span class="coord-value" id="fingerY">—</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Δ Y</span>
+                            <span class="coord-value" id="fingerDeltaY">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls Card -->
+                <div class="card controls-card">
+                    <div class="card-header">
+                        <span class="card-icon">⚙️</span>
+                        <h2>Controls</h2>
+                    </div>
+                    <div class="controls-content">
+                        <div class="control-row">
+                            <label for="sensitivitySlider">Sensitivity</label>
+                            <input type="range" id="sensitivitySlider" min="1" max="10" value="5" class="slider">
+                            <span class="slider-value" id="sensitivityValue">5</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="cooldownSlider">Cooldown (s)</label>
+                            <input type="range" id="cooldownSlider" min="0.5" max="3" step="0.1" value="1.5" class="slider">
+                            <span class="slider-value" id="cooldownValue">1.5</span>
+                        </div>
+                        <button class="btn btn-primary" id="startBtn">
+                            <span class="btn-icon">▶</span>
+                            Start Camera
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Scroll Counter -->
+        <div class="scroll-counter" id="scrollCounter">
+            <span class="counter-value" id="counterValue">0</span>
+            <span class="counter-label">Scrolls Detected</span>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
