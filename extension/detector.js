@@ -6,8 +6,7 @@
 // via chrome.runtime messaging.
 // ============================================
 
-import { HandLandmarker, FilesetResolver } from
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+import { HandLandmarker, FilesetResolver } from "./vision_bundle.mjs";
 
 // ============================================
 // DOM
@@ -68,12 +67,12 @@ async function init() {
         detLabel.textContent = "Loading model...";
 
         const vision = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+            chrome.runtime.getURL("wasm")
         );
 
         handLandmarker = await HandLandmarker.createFromOptions(vision, {
             baseOptions: {
-                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+                modelAssetPath: chrome.runtime.getURL("models/hand_landmarker.task"),
                 delegate: "GPU"
             },
             runningMode: "VIDEO",
@@ -260,14 +259,18 @@ function trackFinger(landmarks, timestamp) {
     const now = performance.now();
     const isCooldownOver = (now - lastGestureTime) > cooldownMs;
 
-    if (isPointing && deltaY > threshold && deltaTime < 500 && isCooldownOver) {
-        onScrollUp(now);
+    if (isPointing && deltaTime < 500 && isCooldownOver) {
+        if (deltaY > threshold) {
+            onScrollUp(now);    // Finger moved UP → next reel
+        } else if (deltaY < -threshold) {
+            onScrollDown(now);  // Finger moved DOWN → previous reel
+        }
     }
 
     // Update gesture display
     if (isPointing) {
         gestureIcon.textContent = "☝️";
-        gestureText.textContent = "Pointing — swipe up to scroll";
+        gestureText.textContent = "Pointing — swipe ↑↓ to scroll";
     } else if (isIndexExtended) {
         gestureIcon.textContent = "✋";
         gestureText.textContent = "Hand detected";
@@ -278,13 +281,41 @@ function trackFinger(landmarks, timestamp) {
 }
 
 // ============================================
-// SCROLL EVENT
+// SCROLL EVENTS
 // ============================================
 function onScrollUp(timestamp) {
     lastGestureTime = timestamp;
     scrollCount++;
 
-    console.log(`🔼 Scroll Up! (#${scrollCount})`);
+    console.log(`⬇️ Next Reel! (#${scrollCount})`);
+
+    // Update UI
+    scrollCountEl.textContent = scrollCount;
+    scrollCountEl.style.animation = "pop 300ms ease";
+    setTimeout(() => scrollCountEl.style.animation = "", 300);
+
+    flash.classList.add("active");
+    setTimeout(() => flash.classList.remove("active"), 500);
+
+    gestureBox.classList.add("detected");
+    gestureIcon.textContent = "⬇️";
+    gestureText.textContent = "NEXT REEL!";
+    setTimeout(() => gestureBox.classList.remove("detected"), 600);
+
+    // Send message to background → Instagram content script
+    chrome.runtime.sendMessage({ type: "SCROLL_NEXT_REEL" }).catch(err => {
+        console.warn("Message send error:", err);
+    });
+
+    // Clear buffer
+    fingerBuffer.length = 0;
+}
+
+function onScrollDown(timestamp) {
+    lastGestureTime = timestamp;
+    scrollCount++;
+
+    console.log(`⬆️ Previous Reel! (#${scrollCount})`);
 
     // Update UI
     scrollCountEl.textContent = scrollCount;
@@ -296,11 +327,11 @@ function onScrollUp(timestamp) {
 
     gestureBox.classList.add("detected");
     gestureIcon.textContent = "⬆️";
-    gestureText.textContent = "SCROLL UP!";
+    gestureText.textContent = "PREVIOUS REEL!";
     setTimeout(() => gestureBox.classList.remove("detected"), 600);
 
     // Send message to background → Instagram content script
-    chrome.runtime.sendMessage({ type: "SCROLL_NEXT_REEL" }).catch(err => {
+    chrome.runtime.sendMessage({ type: "SCROLL_PREV_REEL" }).catch(err => {
         console.warn("Message send error:", err);
     });
 
@@ -325,3 +356,4 @@ cooldownSlider.addEventListener("input", (e) => {
 // START
 // ============================================
 init();
+
