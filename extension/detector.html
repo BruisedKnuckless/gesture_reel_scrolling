@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Detector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="detector.css">
+</head>
+<body>
+    <div class="detector">
+        <!-- Header -->
+        <div class="det-header">
+            <div class="det-title">
+                <span>👆</span>
+                <h1>Gesture Detector</h1>
+            </div>
+            <div class="det-status" id="detStatus">
+                <span class="det-dot" id="detDot"></span>
+                <span class="det-label" id="detLabel">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Camera -->
+        <div class="det-camera" id="cameraBox">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="overlay"></canvas>
+            <div class="det-flash" id="flash"></div>
+            <div class="det-loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading AI model...</p>
+            </div>
+        </div>
+
+        <!-- Gesture Feedback -->
+        <div class="det-gesture" id="gestureBox">
+            <span class="gesture-icon" id="gestureIcon">✊</span>
+            <span class="gesture-text" id="gestureText">Waiting for hand...</span>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="det-stats">
+            <div class="stat">
+                <span class="stat-value" id="scrollCount">0</span>
+                <span class="stat-label">Scrolls</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="fingerPos">—</span>
+                <span class="stat-label">Finger Y</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="deltaDisplay">—</span>
+                <span class="stat-label">Δ Y</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="det-controls">
+            <div class="control-row">
+                <label>Sensitivity</label>
+                <input type="range" id="sensitivitySlider" min="1" max="10" value="5" class="slider">
+                <span class="slider-val" id="sensVal">5</span>
+            </div>
+            <div class="control-row">
+                <label>Cooldown</label>
+                <input type="range" id="cooldownSlider" min="0.5" max="3" step="0.1" value="1.5" class="slider">
+                <span class="slider-val" id="coolVal">1.5s</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="detector.js"></script>
+</body>
+</html>

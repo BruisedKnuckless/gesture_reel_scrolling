@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Reel Scroll</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup">
+        <div class="popup-header">
+            <span class="popup-logo">👆</span>
+            <h1>Gesture Scroll</h1>
+        </div>
+
+        <p class="popup-desc">Control Instagram Reels with hand gestures</p>
+
+        <!-- Status -->
+        <div class="popup-status" id="popupStatus">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-label" id="statusLabel">Inactive</span>
+        </div>
+
+        <!-- Instructions -->
+        <div class="popup-instructions" id="instructions">
+            <div class="step">
+                <span class="step-num">1</span>
+                <span>Open Instagram Reels</span>
+            </div>
+            <div class="step">
+                <span class="step-num">2</span>
+                <span>Click Launch below</span>
+            </div>
+            <div class="step">
+                <span class="step-num">3</span>
+                <span>Point ☝️ and swipe up to scroll</span>
+            </div>
+        </div>
+
+        <!-- Warning for non-Instagram pages -->
+        <div class="popup-warning hidden" id="warningMsg">
+            <span>⚠️</span>
+            <span>Navigate to <strong>instagram.com</strong> first</span>
+        </div>
+
+        <!-- Active message -->
+        <div class="popup-active hidden" id="activeMsg">
+            <span>✅</span>
+            <span>Gesture control is <strong>active</strong></span>
+        </div>
+
+        <button class="popup-btn" id="launchBtn">
+            <span class="btn-icon">🚀</span>
+            Launch Gesture Control
+        </button>
+
+        <button class="popup-btn stop-btn hidden" id="stopBtn">
+            <span class="btn-icon">⏹</span>
+            Stop
+        </button>
+
+        <p class="popup-footer">v1.0 — Phase 2</p>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body>
+<script>
+// Generate extension icons and download them
+const sizes = [16, 48, 128];
+
+for (const size of sizes) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Background gradient
+    const gradient = ctx.createLinearGradient(0, 0, size, size);
+    gradient.addColorStop(0, "#6366f1");
+    gradient.addColorStop(1, "#8b5cf6");
+
+    // Rounded rect
+    const r = size * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(size - r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size - r);
+    ctx.quadraticCurveTo(size, size, size - r, size);
+    ctx.lineTo(r, size);
+    ctx.quadraticCurveTo(0, size, 0, size - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Up arrow icon
+    ctx.fillStyle = "white";
+    const cx = size / 2;
+    const cy = size / 2;
+    const s = size / 6;
+
+    // Arrow head
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s * 1.5);
+    ctx.lineTo(cx - s, cy - s * 0.3);
+    ctx.lineTo(cx - s * 0.35, cy - s * 0.3);
+    ctx.lineTo(cx - s * 0.35, cy + s * 1.5);
+    ctx.lineTo(cx + s * 0.35, cy + s * 1.5);
+    ctx.lineTo(cx + s * 0.35, cy - s * 0.3);
+    ctx.lineTo(cx + s, cy - s * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Download
+    const link = document.createElement("a");
+    link.download = `icon${size}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+}
+
+document.body.innerHTML = "<h1>Icons generated! Check your downloads.</h1>";
+</script>
+</body>
+</html>
