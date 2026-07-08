@@ -6,7 +6,7 @@ No external API calls, no servers, and zero telemetry. Fully compliant with Chro
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 *   **☝️ Next Reel (Swipe Up):** Raise only your index finger and swipe upward to scroll to the next Reel.
 *   **✌️ Previous Reel (Two-Finger Motion):** Show your index and middle fingers and make a slight motion to go back to the previous Reel.
