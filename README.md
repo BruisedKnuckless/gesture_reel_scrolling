@@ -1,4 +1,4 @@
-# Gesture Reel Scroll
+# Gesture Reel Scroll (Made with the help of AI and my Brain)
 
 An AI-powered, zero-touch Chrome Extension and standalone web application that allows you to control Instagram Reels using real-time hand gestures. Powered by Google MediaPipe's Hand Landmarker model running fully client-side on WebAssembly (WASM).
 
